@@ -18,7 +18,7 @@ export class ProductRouter extends Router {
       let res = ctx.response;
       let lastModified = ctx.request.get(LAST_MODIFIED);
       if (lastModified && productsLastUpdateMillis && productsLastUpdateMillis <= new Date(lastModified).getTime()) {
-        log('search / - 304 Not Modified (the client can use the cached data)');
+        log('search / - 304 Not Modified');
         res.status = NOT_MODIFIED;
       } else {
         res.body = await this.productStore.find({user: ctx.state.user._id});
@@ -29,26 +29,27 @@ export class ProductRouter extends Router {
         log('search / - 200 Ok');
       }
     }).get('/:id', async(ctx) => {
-      let product = await this.productStore.findOne({_id: ctx.params.id});
+        log( this.productStore);
+      let product = await this.productStore.findOne({id: ctx.params.id});
       let res = ctx.response;
       if (product) {
         if (product.user == ctx.state.user._id) {
           log('read /:id - 200 Ok');
-          this.setNoteRes(res, OK, product); //200 Ok
+          this.setProductRes(res, OK, product); //200 Ok
         } else {
           log('read /:id - 403 Forbidden');
           setIssueRes(res, FORBIDDEN, [{error: "It's not your product"}]);
         }
       } else {
-        log('read /:id - 404 Not Found (if you know the resource was deleted, then you can return 410 Gone)');
-        setIssueRes(res, NOT_FOUND, [{warning: 'Note not found'}]);
+        log('read /:id - 404 Not Found ');
+        setIssueRes(res, NOT_FOUND, [{warning: 'Product not found'}]);
       }
     }).post('/', async(ctx) => {
       let product = ctx.request.body;
       let res = ctx.response;
       if (product.name) { //validation
           product.user = ctx.state.user._id;
-        await this.createNote(ctx, res, product);
+        await this.createProduct(ctx, res, product);
       } else {
         log(`create / - 400 Bad Request`);
         setIssueRes(res, BAD_REQUEST, [{error: 'Text is missing'}]);
@@ -56,22 +57,22 @@ export class ProductRouter extends Router {
     }).put('/:id', async(ctx) => {
       let product = ctx.request.body;
       let id = ctx.params.id;
-      let productId = product._id;
+      let productId = product.id;
       let res = ctx.response;
-      if (productId && productId != id) {
+     if (productId && productId != id) {
         log(`update /:id - 400 Bad Request (param id and body _id should be the same)`);
         setIssueRes(res, BAD_REQUEST, [{error: 'Param id and body _id should be the same'}]);
         return;
       }
       if (!product.name) {
         log(`update /:id - 400 Bad Request (validation errors)`);
-        setIssueRes(res, BAD_REQUEST, [{error: 'Text is missing'}]);
+        setIssueRes(res, BAD_REQUEST, [{error: 'Name is missing'}]);
         return;
       }
       if (!productId) {
-        await this.createNote(ctx, res, product);
+        await this.createProduct(ctx, res, product);
       } else {
-        let persistedProduct = await this.productStore.findOne({_id: id});
+        let persistedProduct = await this.productStore.findOne({id: product.id});
         if (persistedProduct) {
           if (persistedProduct.user != ctx.state.user._id) {
             log('update /:id - 403 Forbidden');
@@ -88,19 +89,16 @@ export class ProductRouter extends Router {
           } else {
               product.version = productVersion + 1;
               product.updated = Date.now();
-            let updatedCount = await this.productStore.update({_id: id}, product);
+			  await this.productStore.remove({_id: product._id});
+			  await this.productStore.insert(product);
               productsLastUpdateMillis = product.updated;
-            if (updatedCount == 1) {
-              this.setNoteRes(res, OK, product); //200 Ok
+              this.setProductRes(res, OK, product); //200 Ok
+              log(` emit product/updated to username ${ctx.state.user.username}`)
               this.io.to(ctx.state.user.username).emit('product/updated', product);
-            } else {
-              log(`update /:id - 405 Method Not Allowed (resource no longer exists)`);
-              setIssueRes(res, METHOD_NOT_ALLOWED, [{error: 'Note no longer exists'}]); //
-            }
           }
         } else {
           log(`update /:id - 405 Method Not Allowed (resource no longer exists)`);
-          setIssueRes(res, METHOD_NOT_ALLOWED, [{error: 'Note no longer exists'}]); //Method Not Allowed
+          setIssueRes(res, METHOD_NOT_ALLOWED, [{error: 'product no longer exists'}]); //Method Not Allowed
         }
       }
     }).del('/:id', async(ctx) => {
@@ -113,16 +111,16 @@ export class ProductRouter extends Router {
     });
   }
 
-  async createNote(ctx, res, product) {
+  async createProduct(ctx, res, product) {
       product.version = 1;
       product.updated = Date.now();
-    let insertedNote = await this.productStore.insert(product);
+    let insertedProduct = await this.productStore.insert(product);
       productsLastUpdateMillis = product.updated;
-    this.setNoteRes(res, CREATED, insertedNote); //201 Created
-    this.io.to(ctx.state.user.username).emit('product/created', insertedNote);
+    this.setProductRes(res, CREATED, insertedProduct); //201 Created
+    this.io.to(ctx.state.user.username).emit('product/created', insertedProduct);
   }
 
-  setNoteRes(res, status, product) {
+  setProductRes(res, status, product) {
     res.body = product;
     res.set({
       [ETAG]: product.version,

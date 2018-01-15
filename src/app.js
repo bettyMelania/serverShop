@@ -42,10 +42,10 @@ app.use(protectedApi.routes()).use(protectedApi.allowedMethods());
 io.on('connection', socketioJwt.authorize(jwtConfig))
   .on('authenticated', (socket) => {
     const username = socket.decoded_token.username;
-    socket.join(username);
+    socket.join('${username}');
     log(`${username} authenticated and joined`);
     socket.on('disconnect', () => {
-      log('${username} disconnected');
+      log(`${username} disconnected`);
     })
   });
 
@@ -54,16 +54,16 @@ io.on('connection', socketioJwt.authorize(jwtConfig))
   const ensureUserAndProducts = async(username) => {
     let user = await userStore.findOne({username: username});
     if (user) {
-      log(`user ${username} was in the store`);
+      log(`user ${username}`);
     } else {
       user = await userStore.insert({username, password: username});
       log(`user added ${JSON.stringify(user)}`);
     }
     let products = await productStore.find({user: user._id});
-    if (products.length > 0) {
+    if (products.length >= 10) {
       log(`user ${username} had ${products.length} products`);
     } else {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 10; i++) {
         let product = await productStore.insert({
           id:`${i}`,
           name: `Products ${username}${i}`,

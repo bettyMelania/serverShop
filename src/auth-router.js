@@ -30,10 +30,9 @@ export class AuthRouter extends Router {
       log(`signup - user ${user.username} created`);
     })
 
-      //http://127.0.0.1:3000/api/auth/signin body: {"username": "betty","password": "betty"}
-    this.post('/signin', async(ctx, next) => {
-		log(`session -receiveid`+ctx.request.body.username +` and `+ctx.request.body.password);
-      let reqBody  = ctx.request.body;
+      //http://127.0.0.1:3000/api/auth/session body: {"username": "betty","password": "betty"}
+    this.post('/session', async(ctx, next) => {
+	  let reqBody  = ctx.request.body;
       if (!reqBody.username || !reqBody.password) {
         log(`session - missing username and password`);
         setIssueRes(ctx.response, BAD_REQUEST, [{error: 'Both username and password must be set'}])
