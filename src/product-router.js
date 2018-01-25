@@ -13,7 +13,6 @@ export class ProductRouter extends Router {
   constructor(props) {
     super(props);
     this.productStore = props.productStore;
-    this.io = props.io;
     this.get('/', async(ctx) => {
       let res = ctx.response;
       let lastModified = ctx.request.get(LAST_MODIFIED);
@@ -93,8 +92,8 @@ export class ProductRouter extends Router {
 			  await this.productStore.insert(product);
               productsLastUpdateMillis = product.updated;
               this.setProductRes(res, OK, product); //200 Ok
-              log(` emit product/updated to username ${ctx.state.user.username}`)
-              this.io.to(ctx.state.user.username).emit('product/updated', product);
+              this.io.emit('product/updated', product);
+              log(` emit product/updated }`)
           }
         } else {
           log(`update /:id - 405 Method Not Allowed (resource no longer exists)`);
@@ -117,7 +116,11 @@ export class ProductRouter extends Router {
     let insertedProduct = await this.productStore.insert(product);
       productsLastUpdateMillis = product.updated;
     this.setProductRes(res, CREATED, insertedProduct); //201 Created
-    this.io.to(ctx.state.user.username).emit('product/created', insertedProduct);
+    this.io.emit('product/created', insertedProduct);
+	log(` emit product/creted }`)
+  }
+  setSocket(socket){
+	this.io=socket;
   }
 
   setProductRes(res, status, product) {

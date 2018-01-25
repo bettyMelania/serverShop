@@ -36,13 +36,15 @@ log('config protected routes');
 app.use(convert(koaJwt(jwtConfig)));
 const protectedApi = new Router({prefix: apiUrl})
 const productStore = dataStore({filename: '../products.json', autoload: true});
-protectedApi.use('/product', new ProductRouter({productStore, io}).routes())
+const productRouter=new ProductRouter({productStore, io});
+protectedApi.use('/product',productRouter.routes())
 app.use(protectedApi.routes()).use(protectedApi.allowedMethods());
 
 io.on('connection', socketioJwt.authorize(jwtConfig))
   .on('authenticated', (socket) => {
     const username = socket.decoded_token.username;
     socket.join('${username}');
+	productRouter.setSocket(socket);
     log(`${username} authenticated and joined`);
     socket.on('disconnect', () => {
       log(`${username} disconnected`);
